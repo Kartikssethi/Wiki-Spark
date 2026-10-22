@@ -1,0 +1,5 @@
+.venv
+*.tsv
+*.gz
+venv/
+/venv
