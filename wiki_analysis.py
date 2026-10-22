@@ -50,4 +50,32 @@ df.groupBy("curr").agg(F.sum("n").alias("total_views")) \
 # Referral type breakdown
 df.groupBy("type").agg(F.sum("n").alias("total")).show()
 
+# Top traffic sources for one page (change TARGET_PAGE to explore others).
+# prev values starting with "other-" are aggregate sources (other-search, other-external,
+# other-empty, other-internal, other-other), the rest are Wikipedia articles
+TARGET_PAGE = "ChatGPT"
+
+target = df.filter(F.col("curr") == TARGET_PAGE)
+
+print(f"Top 20 traffic sources for {TARGET_PAGE}:")
+target.groupBy("prev", "type").agg(F.sum("n").alias("clicks")) \
+  .orderBy(F.desc("clicks")).show(20, truncate=False)
+
+print(f"Monthly views of {TARGET_PAGE}:")
+target.groupBy("month").agg(F.sum("n").alias("views")) \
+  .orderBy("month").show()
+
+# Strongest article -> article navigation edges (internal links only), summed over all months
+links = df.filter(F.col("type") == "link")
+
+print("Top 20 strongest navigation edges:")
+links.groupBy("prev", "curr").agg(F.sum("n").alias("clicks")) \
+  .orderBy(F.desc("clicks")).show(20, truncate=False)
+
+# Pages that send the most readers onward via internal links
+print("Top 15 pages by outgoing link clicks:")
+links.groupBy("prev").agg(F.sum("n").alias("outgoing_clicks"),
+                          F.countDistinct("curr").alias("distinct_targets")) \
+  .orderBy(F.desc("outgoing_clicks")).show(15, truncate=False)
+
 spark.stop()
