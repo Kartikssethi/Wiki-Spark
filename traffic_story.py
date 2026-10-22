@@ -2,7 +2,7 @@ import os
 from pyspark.sql import functions as F
 from common import get_spark, load_clickstream
 
-CASE_PAGE = "Narendra_Modi"   # case-study page; any title works
+CASE_PAGE = "Artificial_intelligence"   # case-study page; any title works
 MIN_VIEWS = 1_000_000                   # only rank pages with at least this many views
 
 os.makedirs("results", exist_ok=True)

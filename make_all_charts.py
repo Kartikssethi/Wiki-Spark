@@ -227,6 +227,82 @@ ax.legend(frameon=False, loc="upper right")
 titles(ax, "Three kinds of pages", "Each dot is one page from the three top-15 lists")
 save(fig, f"{out}/page_types_scatter.png")
 
+# Rabbit-hole networks (from rabbit_hole_graph.py; skipped until that script has been run)
+if os.path.exists(os.path.join(RESULTS, "rabbit_tree.csv")):
+    tree = load("rabbit_tree")
+    for seed, edges in tree.groupby("seed", sort=False):
+        # Place each page in the column of the hop where it first appears, grouped under its parent
+        depth, columns = {seed: 0}, {0: [seed]}
+        for hop in sorted(edges["hop"].unique()):
+            step = edges[edges["hop"] == hop].copy()
+            step["parent_order"] = step["prev"].map(lambda p: columns.get(hop - 1, []).index(p)
+                                                    if p in columns.get(hop - 1, []) else 999)
+            for _, e in step.sort_values(["parent_order", "clicks"], ascending=[True, False]).iterrows():
+                if e["curr"] not in depth:
+                    depth[e["curr"]] = hop
+                    columns.setdefault(hop, []).append(e["curr"])
+        # Only draw links that go deeper; links back to pages already shown would sit on top of them
+        edges = edges[[depth[c] > depth[p] for p, c in zip(edges["prev"], edges["curr"])]]
+        tallest = max(len(c) for c in columns.values())
+        pos = {page: (d, -(i - (len(columns[d]) - 1) / 2))
+               for d, pages in columns.items() for i, page in enumerate(pages)}
+
+        fig, ax = plt.subplots(figsize=(17, max(6, 0.5 * tallest + 2)))
+        max_clicks = edges["clicks"].max()
+        for _, e in edges.iterrows():
+            (x1, y1), (x2, y2) = pos[e["prev"]], pos[e["curr"]]
+            ax.plot([x1, x2], [y1, y2], zorder=1, solid_capstyle="round", color=ORANGE, alpha=0.55,
+                    linewidth=0.8 + 7 * (e["clicks"] / max_clicks) ** 0.5)
+            if e["hop"] == 1:
+                ax.text((x1 + x2) / 2, (y1 + y2) / 2, f"{e['share_pct']:.0f}%", fontsize=8,
+                        color=INK_2, ha="center", va="center", zorder=2,
+                        bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none"))
+        for page, (x, y) in pos.items():
+            is_seed = page == seed
+            ax.text(x, y, nice(page, 30), ha="center", va="center", zorder=3, fontsize=8.5,
+                    color="white" if is_seed else INK, fontweight="bold" if is_seed else "normal",
+                    bbox=dict(boxstyle="round,pad=0.35", fc=BLUE if is_seed else "white",
+                              ec=BLUE if is_seed else GRID, linewidth=1))
+        for d in columns:
+            ax.text(d, tallest / 2 + 0.6, ["Start", "1st click", "2nd click", "3rd click"][d],
+                    ha="center", fontsize=9.5, color=INK_2, fontweight="bold")
+        ax.set_xlim(-0.6, max(columns) + 0.6)
+        ax.set_ylim(-tallest / 2 - 0.3, tallest / 2 + 1)
+        ax.axis("off")
+        titles(ax, f"The rabbit hole from {nice(seed)}",
+               "Where readers click next, then next again · line width = clicks · "
+               "% = share of the start page's onward clicks")
+        save(fig, f"{out}/rabbit_tree_{seed}.png")
+
+if os.path.exists(os.path.join(RESULTS, "rabbit_paths.csv")):
+    paths = load("rabbit_paths")
+    seeds = list(dict.fromkeys(paths["seed"]))
+    longest = paths.groupby("seed").size().max()
+    fig, axes = plt.subplots(1, len(seeds), figsize=(5.2 * len(seeds), 0.85 * longest + 2.2))
+    for ax, seed in zip(list(axes) if len(seeds) > 1 else [axes], seeds):
+        steps = paths[paths["seed"] == seed].sort_values("step")
+        pages = [seed] + list(steps["curr"])
+        for i, page in enumerate(pages):
+            ax.text(0, -i, nice(page, 30), ha="center", va="center", fontsize=9, zorder=3,
+                    color="white" if i == 0 else INK, fontweight="bold" if i == 0 else "normal",
+                    bbox=dict(boxstyle="round,pad=0.4", fc=BLUE if i == 0 else "white",
+                              ec=BLUE if i == 0 else GRID))
+        for i, (_, s) in enumerate(steps.iterrows()):
+            ax.annotate("", xy=(0, -i - 0.72), xytext=(0, -i - 0.28),
+                        arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=1.6))
+            ax.text(0.06, -i - 0.5, f"{s['share_pct']:.0f}% · {human(s['clicks'])}", fontsize=8,
+                    color=INK_2, va="center")
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-longest - 0.6, 0.6)
+        ax.axis("off")
+    fig.suptitle("Most likely rabbit-hole paths", x=0.01, ha="left", fontsize=12.5, fontweight="bold")
+    fig.text(0.01, 0.93, "Each step follows the most-clicked link to a page not yet visited · "
+             "% = share of that page's onward clicks", fontsize=9, color=INK_2)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    fig.savefig(f"{out}/rabbit_paths.png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print("saved", f"{out}/rabbit_paths.png")
+
 # ---------------------------------------------------------------------------
 # 04 Case study
 # ---------------------------------------------------------------------------
