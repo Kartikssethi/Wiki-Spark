@@ -1,17 +1,23 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, StringType, LongType
 from pyspark.sql import functions as F
 
 spark = SparkSession.builder \
     .appName("WikiClickstream2026") \
     .config("spark.driver.memory", "8g") \
+    .config("spark.driver.host", "localhost") \
+    .config("spark.driver.bindAddress", "127.0.0.1") \
     .getOrCreate()
+
+# Hide the per-block "Not enough space to cache ... persisting to disk" WARN spam;
+# spilling the cache to disk is expected with ~14GB of input and 8GB of driver memory
+spark.sparkContext.setLogLevel("ERROR")
 
 schema = StructType([
     StructField("prev", StringType(), True),
     StructField("curr", StringType(), True),
     StructField("type", StringType(), True),
-    StructField("n", IntegerType(), True),
+    StructField("n", LongType(), True),
 ])
 
 months = ["01", "02", "03", "04", "05", "06", "07", "08", "09"]
@@ -19,7 +25,8 @@ months = ["01", "02", "03", "04", "05", "06", "07", "08", "09"]
 dfs = []
 for m in months:
     filename = f"Data/clickstream-enwiki-2026-{m}.tsv"
-    temp = spark.read.csv(filename, sep="\t", schema=schema) \
+    # quote="" disables quote handling: titles like "Weird_Al"_Yankovic start with a literal "
+    temp = spark.read.csv(filename, sep="\t", schema=schema, quote="") \
         .withColumn("month", F.lit(f"2026-{m}"))
     dfs.append(temp)
 
