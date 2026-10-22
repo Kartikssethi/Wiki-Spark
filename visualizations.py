@@ -20,7 +20,7 @@ def clean_title(t):
     return str(t).replace("_", " ")[:26]
 
 # Filter out technical landing pages (like Main_Page, Hyphen-minus, .xxx) for a clean article comparison
-non_articles = ["Main_Page", "Hyphen-minus", ".xxx", ".xyz"]
+non_articles = ["Main_Page"]
 clean_views = df_views[~df_views["title"].isin(non_articles)].head(10)
 clean_pr = df_pr.head(10)
 
